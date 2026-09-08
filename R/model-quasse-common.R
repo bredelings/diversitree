@@ -184,7 +184,9 @@ quasse.extent <- function(control, drift, diffusion) {
     ndat <- nx*c(r, 1)
     padding <- NULL
   } else {
-    mean <- drift * dt
+    ## Backward likelihood propagation convolves with mean -drift*dt, as in both FFT backends.
+    ## Positive forward drift therefore needs more negative-offset (left kernel) support.
+    mean <- -drift * dt
     sd   <- sqrt(diffusion * dt)
 
     ## Another option here is to compute all the possible x values and

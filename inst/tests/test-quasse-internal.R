@@ -20,6 +20,19 @@ test_that("asymmetric circular convolution has the intended direction", {
   expect_equal(Re(fft(fft(impulse) * fft(kernel), inverse=TRUE)) / 8, expected)
 })
 
+## Gaussian endpoints determine kernel support, independently of a likelihood comparison.
+## Both drift signs protect the convention that zero-drift comparisons cannot test.
+test_that("padding covers backward Gaussian support", {
+  control <- list(nx=1024, dx=.01, dt.max=.1, xmid=0, r=4, w=5, method="fftC")
+  for (v in c(-.2, 0, .2)) {
+    ext <- diversitree:::quasse.extent(control, v, .01)
+    endpoints <- -v * control$dt.max + c(-1, 1) * control$w * sqrt(.01 * control$dt.max)
+    expect_equal(unname(ext$padding[2,]), ceiling(c(-endpoints[1], endpoints[2]) / control$dx))
+    expect_equal(ext$padding[1,], 4 * ext$padding[2,])
+    expect_equal(ext$x[[1]][ext$tr], ext$x[[2]])
+  }
+})
+
 test_that("quasse-internal", {
 
 ## Imports that are generally hidden.
