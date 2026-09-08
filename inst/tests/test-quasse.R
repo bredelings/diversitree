@@ -32,21 +32,22 @@ lik.M.1 <- make.quasse(phy, phy$tip.state, sd, sigmoid.x, constant.x,
 lik.R.1 <- make.quasse(phy, phy$tip.state, sd, sigmoid.x, constant.x,
                        control.R.1)
 
-expect_that(lik.C.1(pars), equals(-62.06409424693976))
-## expect_that(lik.R.1(pars), equals(-62.06409424699397)) # slow...
-expect_that(lik.M.1(pars), equals(-62.03237853382663))
+## Conditioned references remove the historical extra dx^2 factor; dx=5*trait range/1024.
+expect_that(lik.C.1(pars), equals(-52.90819039933757))
+## expect_that(lik.R.1(pars), equals(-52.908190399391778)) # slow...
+expect_that(lik.M.1(pars), equals(-52.876474686224441))
 
 ## Now, test root treatment:
-expect_that(lik.C.1(pars, root=ROOT.FLAT), equals(-64.776449394936876))
+expect_that(lik.C.1(pars, root=ROOT.FLAT), equals(-55.620545547334686))
 expect_that(lik.C.1(pars, condition.surv=FALSE), equals(-55.068978927659984))
 root.f <- function(x)
   dnorm(x, mean(phy$tip.state), sd(phy$tip.state))
 expect_that(lik.C.1(pars, root=ROOT.GIVEN, root.f=root.f),
-            equals(-63.125087556209579))
+            equals(-53.969183708607389))
 
 ## With drift:
 pars2 <- pars
 pars2[6] <- 0.01
-expect_that(lik.C.1(pars2), equals(-62.040165682569537))
+expect_that(lik.C.1(pars2), equals(-52.884261834967347))
 }
 })

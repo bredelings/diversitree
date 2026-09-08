@@ -2,6 +2,28 @@ source("helper-diversitree.R")
 
 context("QuaSSE (internal)")
 
+## Analytical root integrals catch spacing factors shared by both PDE implementations.
+## Keep this independent of propagation; it remains needed while root conditioning uses quadrature.
+test_that("root conditioning integrates densities before division", {
+  for (n in c(4L, 8L, 16L)) {
+    dx <- 1/n
+    rootfun <- diversitree:::make.rootfunc.quasse(list(root=1L, control=list(nx=n, dx=dx)))
+    pars <- list(lo=list(ndat=n, nx=n, x=(seq_len(n)-.5)*dx, lambda=rep(.15, n)))
+    res <- list(vals=cbind(rep(0, n), rep(2, n)), lq=log(3))
+    unconditioned <- rootfun(res, pars, FALSE, ROOT.OBS, NULL, FALSE)
+    conditioned <- rootfun(res, pars, TRUE, ROOT.OBS, NULL, FALSE)
+    expect_equal(unconditioned, log(6), tolerance=1e-12)
+    expect_equal(conditioned-unconditioned, -log(.15), tolerance=1e-12)
+
+    ## D=2 gives p=1 on a unit interval. The two equal-width regions contribute
+    ## (.2*1^2 + .6*.5^2)/2 = .175 to the conditioning integral.
+    pars$lo$lambda <- rep(c(.2, .6), length.out=n)
+    res$vals[,1] <- rep(c(0, .5), length.out=n)
+    expect_equal(rootfun(res, pars, TRUE, ROOT.OBS, NULL, FALSE),
+                 log(6/.175), tolerance=1e-12)
+  }
+})
+
 ## Direct circular convolution fixes the offset convention independently of FFT implementations.
 ## Each kernel entry j represents offset j-1 modulo the array length.
 quasse.direct.convolution <- function(x, kernel) {

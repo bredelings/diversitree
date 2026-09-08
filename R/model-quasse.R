@@ -197,7 +197,10 @@ make.rootfunc.quasse <- function(cache) {
     if ( condition.surv ) {
       lambda <- pars$lo$lambda
       e.root <- vals[,1]
-      d.root <- d.root / sum(root.p * lambda * (1 - e.root)^2) * dx
+      ## root.p contains densities: integrate the conditioning denominator before dividing D.
+      ## Multiplying D by dx after division instead would introduce an extra dx^2 factor.
+      p.surv <- sum(root.p * lambda * (1 - e.root)^2) * dx
+      d.root <- d.root / p.surv
     }
 
     loglik <- log(sum(root.p * d.root) * dx) + sum(lq)
