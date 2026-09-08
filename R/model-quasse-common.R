@@ -184,15 +184,17 @@ quasse.extent <- function(control, drift, diffusion) {
     ndat <- nx*c(r, 1)
     padding <- NULL
   } else {
-    ## Backward likelihood propagation convolves with mean -drift*dt, as in both FFT backends.
-    ## Positive forward drift therefore needs more negative-offset (left kernel) support.
-    mean <- -drift * dt
-    sd   <- sqrt(diffusion * dt)
-
-    ## Another option here is to compute all the possible x values and
-    ## then just drop the ones that are uninteresting?
-    nkl <- max(ceiling(-(mean - w * sd)/dx)) * c(r, 1)
-    nkr <- max(ceiling( (mean + w * sd)/dx)) * c(r, 1)
+    ## Backward convolution has mean -drift*t. Its support extents are drift*t+a*sqrt(t)
+    ## and -drift*t+a*sqrt(t), a=w*sqrt(diffusion). The growing side peaks at dt.max;
+    ## the opposing side peaks at min(dt.max, (a/(2*abs(drift)))^2). Maximise each
+    ## regime separately before combining split models; round coarse support then scale it.
+    a <- w * sqrt(diffusion)
+    speed <- abs(drift)
+    peak <- pmin(dt, (a / (2 * speed))^2)
+    growing <- speed * dt + a * sqrt(dt)
+    opposing <- a * sqrt(peak) - speed * peak
+    nkl <- max(ceiling(ifelse(drift >= 0, growing, opposing)/dx)) * c(r, 1)
+    nkr <- max(ceiling(ifelse(drift >= 0, opposing, growing)/dx)) * c(r, 1)
     ndat <- nx*c(r, 1) - (nkl + 1 + nkr)
 
     padding <- cbind(nkl, nkr)
