@@ -20,6 +20,41 @@ test_that("asymmetric circular convolution has the intended direction", {
   expect_equal(Re(fft(fft(impulse) * fft(kernel), inverse=TRUE)) / 8, expected)
 })
 
+## Direct convolution checks both boundary strips and the unaffected interior for asymmetric support.
+## End-to-end comparisons with negligible boundary D cannot expose swapped strips or backend policy.
+test_that("FFT boundary strips match their input dependencies", {
+  nx <- 32L
+  dx <- .1
+  ptr <- .Call(diversitree:::r_make_quasse_fft, nx, dx, 2L, -1L)
+  for (padding in list(c(5L, 2L), c(2L, 5L))) {
+    nkl <- padding[1]
+    nkr <- padding[2]
+    ndat <- nx - nkl - nkr - 1L
+    drift <- if (nkl > nkr) .2 else -.2
+    offsets <- c(0:nkr, rep(NA, nx-nkl-nkr-1L), -nkl:-1)
+    kernel <- dnorm(offsets * dx, -drift * .1, sqrt(.01 * .1))
+    kernel[is.na(kernel)] <- 0
+    kernel <- kernel / sum(kernel)
+    vars <- cbind(c(seq_len(ndat) / ndat, rep(0, nx-ndat)),
+                  c(rev(seq_len(ndat)) / ndat, rep(0, nx-ndat)))
+    ## The registered C entry also propagates time. For pure birth, E'=E/h and D'=z*D/h^2,
+    ## where z=exp(lambda*dt), h=z*(1-E)+E. Apply that exact step before direct convolution.
+    z <- exp(.1 * .1)
+    h <- z * (1-vars[,1]) + vars[,1]
+    vars.t <- cbind(vars[,1] / h, z * vars[,2] / h^2)
+    expected <- apply(vars.t, 2, quasse.direct.convolution, kernel=kernel)
+    boundary <- c(seq_len(nkr), ndat-seq_len(nkl)+1L)
+    expected[(ndat+1L):nx,] <- 0
+    expected[boundary,1] <- vars.t[boundary,1]
+    actual.c <- .Call(diversitree:::r_do_integrate, ptr, vars, rep(.1, ndat),
+                      rep(0, ndat), drift, .01, 1L, .1, padding)
+    expect_equal(actual.c, expected, tolerance=1e-12)
+    expected[boundary,2] <- vars.t[boundary,2]
+    actual.r <- diversitree:::fftR.propagate.x(vars.t, nx, fft(kernel), nkl, nkr)
+    expect_equal(actual.r, expected, tolerance=1e-12)
+  }
+})
+
 ## Gaussian endpoints determine kernel support, independently of a likelihood comparison.
 ## Both drift signs protect the convention that zero-drift comparisons cannot test.
 test_that("padding covers backward Gaussian support", {

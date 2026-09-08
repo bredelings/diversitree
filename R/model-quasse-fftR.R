@@ -84,12 +84,13 @@ fftR.propagate.x <- function(vars, nx, fy, nkl, nkr) {
   }
   vars.out <- Re(apply(apply(vars, 2, fft) * fy, 2, ifft))/nx
   ndat <- nx - (nkl + 1 + nkr)
-  i.prev.l <- 1:nkl
-  i.prev.r <- (ndat-nkr+1):ndat
+  ## Convolution reads input at i-offset: positive offsets need left boundary values,
+  ## and negative offsets need right boundary values. These widths are intentionally crossed.
+  i.prev.l <- seq_len(nkr)
+  i.prev.r <- ndat - seq_len(nkl) + 1L
   i.zero <- (ndat+1):nx
   vars.out[c(i.prev.l, i.prev.r),] <- vars[c(i.prev.l, i.prev.r),]
   vars.out[i.zero,] <- 0
   vars.out[vars.out < 0] <- 0
   vars.out
 }
-

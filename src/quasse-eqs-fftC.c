@@ -405,17 +405,19 @@ void propagate_x(quasse_fft *obj, int idx) {
   int nkl = obj->nkl, nkr = obj->nkr, npad = obj->npad;
   int nd=obj->nd[idx];
 
-  /* TODO: I am not sure if these are flipped nkl/nkr */
-  for ( i = 0; i < nkl; i++ )
+  /* Convolution reads x[i-offset]. Positive kernel offsets require nkr left
+     boundary values; negative offsets require nkl right values. Restore E only,
+     retaining this backend's existing policy for D. */
+  for ( i = 0; i < nkr; i++ )
     wrk[i] = x[i];
-  for ( i = nx-npad-nkr; i < nx - npad; i++ )
+  for ( i = nx-npad-nkl; i < nx - npad; i++ )
     wrk[i] = x[i];
 
   convolve(obj->fft[idx], obj->kern_y);
 
-  for ( i = 0; i < nkl; i++ )
+  for ( i = 0; i < nkr; i++ )
     x[i] = wrk[i];
-  for ( i = nx-npad-nkr; i < nx - npad; i++ )
+  for ( i = nx-npad-nkl; i < nx - npad; i++ )
     x[i] = wrk[i];
 
   /* Zeroing takes a little more work, now.  We might be able to get
