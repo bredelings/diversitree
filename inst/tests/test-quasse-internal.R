@@ -2,6 +2,24 @@ source("helper-diversitree.R")
 
 context("QuaSSE (internal)")
 
+## Direct circular convolution fixes the offset convention independently of FFT implementations.
+## Each kernel entry j represents offset j-1 modulo the array length.
+quasse.direct.convolution <- function(x, kernel) {
+  n <- length(x)
+  vapply(seq_len(n), function(i)
+    sum(kernel * x[((i - seq_len(n)) %% n) + 1L]), numeric(1))
+}
+
+## An asymmetric impulse protects the convolution orientation; symmetric-kernel tests cannot.
+## This reference remains useful whenever the FFT implementation or its layout changes.
+test_that("asymmetric circular convolution has the intended direction", {
+  kernel <- c(.2, .1, 0, 0, 0, 0, .3, .4)
+  impulse <- c(0, 0, 0, 1, 0, 0, 0, 0)
+  expected <- c(0, .3, .4, .2, .1, 0, 0, 0)
+  expect_equal(quasse.direct.convolution(impulse, kernel), expected)
+  expect_equal(Re(fft(fft(impulse) * fft(kernel), inverse=TRUE)) / 8, expected)
+})
+
 test_that("quasse-internal", {
 
 ## Imports that are generally hidden.
