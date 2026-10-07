@@ -138,8 +138,9 @@ SEXP r_do_integrate(SEXP extPtr, SEXP vars, SEXP lambda, SEXP mu,
 
   obj->lambda = REAL(lambda);
   obj->mu = REAL(mu);
+  /* Each Strang reaction uses dt/2; the diffusion kernel still uses dt. */
   for ( i = 0; i < ndat; i++ )
-    obj->z[i] = exp(c_dt * (c_lambda[i] - c_mu[i]));
+    obj->z[i] = exp((c_dt / 2) * (c_lambda[i] - c_mu[i]));
 
   qf_setup_kern(obj, c_drift, c_diffusion, c_dt, nkl, nkr);
 
@@ -211,8 +212,9 @@ SEXP r_do_tips(SEXP extPtr, SEXP vars, SEXP lambda, SEXP mu,
     nd = obj->nd[idx];
 
     if ( c_nt > 0 ) {
+      /* Match the half-step reaction factors used by ordinary segments. */
       for ( i = 0; i < ndat; i++ )
-	obj->z[i] = exp(c_dt * (c_lambda[i] - c_mu[i]));
+	obj->z[i] = exp((c_dt / 2) * (c_lambda[i] - c_mu[i]));
       qf_setup_kern(obj, c_drift, c_diffusion, c_dt, nkl, nkr);
       do_integrate(obj, c_nt, idx);
     }
@@ -354,11 +356,15 @@ void qf_setup_kern(quasse_fft *obj, double drift, double diffusion,
   fftw_execute(obj->kernel->plan_f);
 }
 
+/* Advance all E/D columns using Strang reaction/diffusion/reaction composition.
+   Callers prepare half-dt reaction factors and a full-dt kernel. Boundary restoration
+   remains part of diffusion; zero steps leave the input unchanged. */
 void do_integrate(quasse_fft *obj, int nt, int idx) {
   int i, nkl=obj->nkl;
   for ( i = 0; i < nt; i++ ) {
     propagate_t(obj, idx);
     propagate_x(obj, idx);
+    propagate_t(obj, idx);
     if ( ISNAN(obj->x[nkl]) )
       Rf_error("Integration failure at step %d\n", i);
   }

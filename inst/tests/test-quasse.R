@@ -32,22 +32,23 @@ lik.M.1 <- make.quasse(phy, phy$tip.state, sd, sigmoid.x, constant.x,
 lik.R.1 <- make.quasse(phy, phy$tip.state, sd, sigmoid.x, constant.x,
                        control.R.1)
 
-## Conditioned references remove the historical extra dx^2 factor; dx=5*trait range/1024.
-expect_that(lik.C.1(pars), equals(-52.90819039933757))
-## expect_that(lik.R.1(pars), equals(-52.908190399391778)) # slow...
+## FFT references use Strang splitting and corrected root quadrature; R/C agree.
+## The method-of-lines reference retains its own integration scheme.
+expect_that(lik.C.1(pars), equals(-52.908292790847973))
+## expect_that(lik.R.1(pars), equals(-52.908292790847973)) # slow...
 expect_that(lik.M.1(pars), equals(-52.876474686224441))
 
 ## Now, test root treatment:
-expect_that(lik.C.1(pars, root=ROOT.FLAT), equals(-55.620545547334686))
-expect_that(lik.C.1(pars, condition.surv=FALSE), equals(-55.068978927659984))
+expect_that(lik.C.1(pars, root=ROOT.FLAT), equals(-55.620649970724379))
+expect_that(lik.C.1(pars, condition.surv=FALSE), equals(-55.069086950452679))
 root.f <- function(x)
   dnorm(x, mean(phy$tip.state), sd(phy$tip.state))
 expect_that(lik.C.1(pars, root=ROOT.GIVEN, root.f=root.f),
-            equals(-53.969183708607389))
+            equals(-53.969303749090820))
 
 ## With drift:
 pars2 <- pars
 pars2[6] <- 0.01
-expect_that(lik.C.1(pars2), equals(-52.884261834967347))
+expect_that(lik.C.1(pars2), equals(-52.884267225490042))
 }
 })

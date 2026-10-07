@@ -59,21 +59,56 @@ test_that("FFT boundary strips match their input dependencies", {
     kernel <- kernel / sum(kernel)
     vars <- cbind(c(seq_len(ndat) / ndat, rep(0, nx-ndat)),
                   c(rev(seq_len(ndat)) / ndat, rep(0, nx-ndat)))
-    ## The registered C entry also propagates time. For pure birth, E'=E/h and D'=z*D/h^2,
-    ## where z=exp(lambda*dt), h=z*(1-E)+E. Apply that exact step before direct convolution.
-    z <- exp(.1 * .1)
-    h <- z * (1-vars[,1]) + vars[,1]
-    vars.t <- cbind(vars[,1] / h, z * vars[,2] / h^2)
-    expected <- apply(vars.t, 2, quasse.direct.convolution, kernel=kernel)
+    ## Pure birth has E'=E/h and D'=z*D/h^2, with z=exp(lambda*dt).
+    ## Compose this independently with direct convolution to check the splitting order.
+    z <- exp(.1 * .1/2)
     boundary <- c(seq_len(nkr), ndat-seq_len(nkl)+1L)
-    expected[(ndat+1L):nx,] <- 0
-    expected[boundary,1] <- vars.t[boundary,1]
-    actual.c <- .Call(diversitree:::r_do_integrate, ptr, vars, rep(.1, ndat),
-                      rep(0, ndat), drift, .01, 1L, .1, padding)
-    expect_equal(actual.c, expected, tolerance=1e-12)
-    expected[boundary,2] <- vars.t[boundary,2]
-    actual.r <- diversitree:::fftR.propagate.x(vars.t, nx, fft(kernel), nkl, nkr)
-    expect_equal(actual.r, expected, tolerance=1e-12)
+    for (steps in c(0L, 1L, 3L)) {
+      for (backend in c("C", "R")) {
+        expected <- vars
+        for (step in seq_len(steps)) {
+          h <- z * (1-expected[,1]) + expected[,1]
+          half <- cbind(expected[,1] / h, z * expected[,2] / h^2)
+          expected <- apply(half, 2, quasse.direct.convolution, kernel=kernel)
+          expected[(ndat+1L):nx,] <- 0
+          expected[boundary,1] <- half[boundary,1]
+          if (backend == "R") expected[boundary,2] <- half[boundary,2]
+          h <- z * (1-expected[,1]) + expected[,1]
+          expected <- cbind(expected[,1] / h, z * expected[,2] / h^2)
+        }
+        actual <- if (backend == "C")
+          .Call(diversitree:::r_do_integrate, ptr, vars, rep(.1, ndat),
+                rep(0, ndat), drift, .01, steps, .1, padding)
+        else
+          diversitree:::quasse.integrate.fftR(vars, rep(.1, ndat), rep(0, ndat),
+                                            drift, .01, steps, .1, nx, ndat, dx, nkl, nkr)
+        expect_equal(actual, expected, tolerance=1e-12)
+      }
+    }
+  }
+})
+
+## Batched tips prepare their own reaction factors and reduce the number of D columns.
+## Compare with ordinary segments to protect this path, which two-tip likelihoods cannot isolate.
+test_that("batched tips use the same Strang steps as ordinary segments", {
+  nx <- 64L
+  padding <- c(4L, 3L)
+  ndat <- nx-sum(padding)-1L
+  x <- seq_len(ndat)/ndat
+  vars <- rbind(cbind(.2*x, x*(1-x), x^2*(1-x)), matrix(0, nx-ndat, 3))
+  lambda <- .1+.2*x
+  mu <- .02+.01*x
+  ptr <- .Call(diversitree:::r_make_quasse_fft, nx, .1, c(3L, 2L), -1L)
+  for (steps in list(c(0L, 2L), c(2L, 0L), c(2L, 3L))) {
+    dt <- c(.1, .03)
+    actual <- .Call(diversitree:::r_do_tips, ptr, vars, lambda, mu,
+                    .2, .01, steps, dt, padding)
+    first <- .Call(diversitree:::r_do_integrate, ptr, vars, lambda, mu,
+                   .2, .01, steps[1], dt[1], padding)
+    last <- .Call(diversitree:::r_do_integrate, ptr, first[,1:2], lambda, mu,
+                  .2, .01, steps[2], dt[2], padding)
+    expect_equal(actual[[1]], first[,c(1,3)], tolerance=1e-12)
+    expect_equal(actual[[2]], last, tolerance=1e-12)
   }
 })
 

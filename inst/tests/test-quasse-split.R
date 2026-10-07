@@ -29,8 +29,8 @@ lik.s <- make.quasse.split(phy, phy$tip.state, sd, sigmoid.x,
 lik.q <- make.quasse(phy, phy$tip.state, sd, sigmoid.x, constant.x,
                      control.C.1)
 ll.q <- lik.q(pars)
-## All regimes share dx=5*trait range/1024; remove the historical extra dx^2 factor.
-expect_that(ll.q, equals(-52.90819039933757))
+## References use Strang splitting and corrected quadrature (dx=5*trait range/1024).
+expect_that(ll.q, equals(-52.908292790847973))
 
 pars.s <- rep(pars, 2)
 names(pars.s) <- argnames(lik.s)
@@ -40,10 +40,11 @@ set.seed(1)
 pars2 <- pars + runif(length(pars), 0, .05)
 pars2.s <- rep(pars2, 2)
 ll.q <- lik.q(pars2)
-expect_that(ll.q, equals(-46.516472906239812))
+expect_that(ll.q, equals(-46.516098037511760))
 expect_that(lik.s(pars2.s), equals(ll.q))
 
 pars3.s <- pars + runif(length(pars.s), 0, .05)
-expect_that(lik.s(pars3.s), equals(-45.317931922902083))
+## Split auxiliary propagation is C-only; the reference also agrees with R main branches.
+expect_that(lik.s(pars3.s), equals(-45.317622460648955))
 }
 })

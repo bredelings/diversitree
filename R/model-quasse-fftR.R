@@ -46,9 +46,12 @@ quasse.integrate.fftR <- function(vars, lambda, mu, drift, diffusion,
   kern <- fftR.make.kern(-dt * drift, sqrt(dt * diffusion),
                          nx, dx, nkl, nkr)
   fy <- fft(kern)  
+  ## Strang composition advances E and D by half a reaction step, a full
+  ## diffusion step, then half a reaction step, keeping the existing boundary policy.
   for ( i in seq_len(nstep) ) {
-    vars <- fftR.propagate.t(vars, lambda, mu, dt, ndat)
+    vars <- fftR.propagate.t(vars, lambda, mu, dt/2, ndat)
     vars <- fftR.propagate.x(vars, nx, fy, nkl, nkr)
+    vars <- fftR.propagate.t(vars, lambda, mu, dt/2, ndat)
   }
   vars
 }
